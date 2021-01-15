@@ -9,6 +9,8 @@
 #define LEDS 25
 #define sensorOut 13
 
+#define BUTTON_PIN 33
+
 #define EOL '\0'
 
 #define RED_COLOR_INDEX 0
@@ -28,6 +30,7 @@ void setup() {
   pinMode(S3, OUTPUT);
   pinMode(LEDS, OUTPUT);
   pinMode(sensorOut, INPUT);
+  pinMode(BUTTON_PIN, INPUT);
 
   // Setting frequency-scaling to 100%
   digitalWrite(S0,HIGH);
@@ -198,5 +201,9 @@ void loop() {
         "'scan real'/'r' - scan a color without mapping\n"
       );
     }
+  }
+
+  if (BT.connected() && digitalRead(BUTTON_PIN)) {
+    scanAndMap();
   }
 }
