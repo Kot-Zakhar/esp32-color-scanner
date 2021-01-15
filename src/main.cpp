@@ -2,25 +2,26 @@
 #include <BluetoothSerial.h>
 // todo: add calibration on default colors
 
-#define S0 12
-#define S1 14
-#define S2 27
-#define S3 26
-#define LEDS 25
-#define sensorOut 13
+#define S0 27
+#define S1 26
+#define S2 25
+#define S3 33
+#define LEDS 32
+#define sensorOut 14
 
-#define BUTTON_PIN 33
+#define BUTTON_PIN 35
 
 #define EOL '\0'
 
 #define RED_COLOR_INDEX 0
 #define GREEN_COLOR_INDEX 1
 #define BLUE_COLOR_INDEX 2
+#define CLEAR_COLOR_INDEX 3
 
 BluetoothSerial BT;
 
-int srcRedLow = 0, srcGreenLow = 0, srcBlueLow = 0;
-int srcRedHigh = 1000, srcGreenHigh = 1000, srcBlueHigh = 1000;
+int srcRedLow = 0, srcGreenLow = 0, srcBlueLow = 0, srcClearLow = 0;
+int srcRedHigh = 1000, srcGreenHigh = 1000, srcBlueHigh = 1000, srcClearHigh = 1000;
 int destLow = 0, destHigh = 255;
 
 void setup() {
@@ -61,6 +62,10 @@ void scanColor(int index, int *value) {
     s2 = LOW;
     s3 = HIGH;
     break;
+  case CLEAR_COLOR_INDEX:
+    s2 = HIGH;
+    s3 = LOW;
+    break;
   default:
     return;
   }
@@ -76,7 +81,7 @@ void scanColor(int index, int *value) {
   digitalWrite(LEDS, LOW);
 }
 
-void scanColors(int *r, int *g, int *b) {
+void scanColors(int *r, int *g, int *b, int *clr) {
   scanColor(RED_COLOR_INDEX, r);
   Serial.printf("R= %d ", *r);
 
@@ -85,6 +90,9 @@ void scanColors(int *r, int *g, int *b) {
 
   scanColor(BLUE_COLOR_INDEX, b);
   Serial.printf("B= %d ", *b);
+
+  scanColor(CLEAR_COLOR_INDEX, clr);
+  Serial.printf("CLR= %d ", *clr);
 
   Serial.println();
 }
@@ -105,6 +113,10 @@ int mapColor(int index, int value) {
     srcLow = srcBlueLow;
     srcHigh = srcBlueHigh;
     break;
+  case CLEAR_COLOR_INDEX:
+    srcLow = srcClearLow;
+    srcHigh = srcClearHigh;
+    break;
   default:
     return 0;
   }
@@ -113,17 +125,17 @@ int mapColor(int index, int value) {
 }
 
 void calibration() {
-  BT.println("Write 'white'/'black'/'red'/'green'/'blue' to scan a calibration color.\nWrite 'end' to stop calibration.");
+  BT.println("Write 'white'/'black'/'red'/'green'/'blue'/'clear' to scan a calibration color.\nWrite 'end'/'e' to stop calibration.");
   String input;
   do {
     input = BT.readStringUntil(EOL);
     if (input == "white" || input == "w") {
-      scanColors(&srcRedHigh, &srcGreenHigh, &srcBlueHigh);
-      BT.printf("{\"r\": %d, \"g\": %d, \"b\": %d}\n", srcRedHigh, srcGreenHigh, srcBlueHigh);
+      scanColors(&srcRedHigh, &srcGreenHigh, &srcBlueHigh, &srcClearHigh);
+      BT.printf("{\"r\": %d, \"g\": %d, \"b\": %d, \"c\": %d}\n", srcRedHigh, srcGreenHigh, srcBlueHigh, srcClearHigh);
     }
     if (input == "black" || input == "b") {
-      scanColors(&srcRedLow, &srcGreenLow, &srcBlueLow);
-      BT.printf("{\"r\": %d, \"g\": %d, \"b\": %d}\n", srcRedLow, srcGreenLow, srcBlueLow);
+      scanColors(&srcRedLow, &srcGreenLow, &srcBlueLow, &srcClearLow);
+      BT.printf("{\"r\": %d, \"g\": %d, \"b\": %d, \"c\": %d}\n", srcRedLow, srcGreenLow, srcBlueLow, srcClearLow);
     }
     if (input == "red") {
       scanColor(RED_COLOR_INDEX, &srcRedHigh);
@@ -137,7 +149,13 @@ void calibration() {
       scanColor(BLUE_COLOR_INDEX, &srcBlueHigh);
       BT.println(srcBlueHigh);
     }
-  } while (input != "end" && input != "");
+    if (input == "clear") {
+      scanColor(CLEAR_COLOR_INDEX, &srcClearHigh);
+      BT.println(srcClearHigh);
+    }
+    if (input == "end" || input == "e")
+      input = "";
+  } while (input != "");
   BT.println("Exiting calibration.");
 }
 
@@ -159,24 +177,30 @@ void manualCalibration() {
   BT.println("blue high value:");
   srcBlueHigh = BT.readStringUntil(EOL).toInt();
 
+  BT.println("clear low value:");
+  srcClearLow = BT.readStringUntil(EOL).toInt();
+  BT.println("clear high value:");
+  srcClearHigh = BT.readStringUntil(EOL).toInt();
+
   BT.println("Manual calibration done.");
 }
 
 void scanAndMap() {
-  int r, g, b;
+  int r, g, b, clr;
 
-  scanColors(&r, &g, &b);
+  scanColors(&r, &g, &b, &clr);
   r = mapColor(RED_COLOR_INDEX, r);
   g = mapColor(GREEN_COLOR_INDEX, g);
   b = mapColor(BLUE_COLOR_INDEX, b);
+  clr = mapColor(CLEAR_COLOR_INDEX, clr);
 
-  BT.printf("{\"r\": %d, \"g\": %d, \"b\": %d}\n", r, g, b);
+  BT.printf("{\"r\": %d, \"g\": %d, \"b\": %d, \"clr\": %d}\n", r, g, b, clr);
 }
 
 void scan() {
-  int r, g, b;
-  scanColors(&r, &g, &b);
-  BT.printf("{\"r\": %d, \"g\": %d, \"b\": %d}\n", r, g, b);
+  int r, g, b, clr;
+  scanColors(&r, &g, &b, &clr);
+  BT.printf("{\"r\": %d, \"g\": %d, \"b\": %d, \"clr\": %d}\n", r, g, b, clr);
 }
 
 
@@ -193,11 +217,22 @@ void loop() {
       scanAndMap();
     } else if (req == "scan real" || req == "r") {
       scan();
+    } else if (req == "scan clear" || req == "clr") {
+      int value;
+      scanColor(CLEAR_COLOR_INDEX, &value);
+      value = mapColor(CLEAR_COLOR_INDEX, value);
+      BT.println(value);
+    } else if (req == "scan clear real" || req == "clrr") {      
+      int value;
+      scanColor(CLEAR_COLOR_INDEX, &value);
+      BT.println(value);
     } else {
       BT.println(
         "'calibrate'/'c' - calibration mode\n"
         "'manual'/'m' - manual calibration mode\n"
         "'scan'/'s' - scan a color and map it to 0..255\n"
+        "'scan clear'/'clr' - scan photodiodes without filter and map it to 0..255\n"
+        "'scan clear real'/'clrr' - scan photodiodes without filter without mapping\n"
         "'scan real'/'r' - scan a color without mapping\n"
       );
     }
