@@ -7,8 +7,11 @@
 #include "functionality.h"
 
 #define EOL '\0'
+#define BT_BUFFER_LENGTH 100
 
 BluetoothSerial BT;
+
+char btBuffer[BT_BUFFER_LENGTH];
 
 void setup() {
   bindPins();
@@ -23,7 +26,7 @@ void setup() {
   Serial.begin(115200);
 
   BT.begin("Color sensor esp32");
-  BT.setTimeout(60000);
+  BT.setTimeout(1000);
 
   initDeviceFunctionality();
   restoreBoundaries();
@@ -186,9 +189,14 @@ void sendHelp() {
 }
 
 void loop() {
-  if (BT.available()) {
-    String req = BT.readStringUntil(EOL);
+  btBuffer[0] = '\0';
+  BT.readBytesUntil(EOL, btBuffer, BT_BUFFER_LENGTH);
 
+  String req = String(btBuffer);
+  req.toLowerCase();
+  req.trim();
+
+  if (req.length() > 0) {
     if (req == "calibrate" || req == "c") {
       calibrationProcess();
     } else if (req == "calibrate manual" || req == "cm") {
